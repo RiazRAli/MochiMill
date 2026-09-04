@@ -83,7 +83,7 @@
   .phase.done{background:linear-gradient(135deg,var(--mint),#bff0dd);color:#2f8f66}
   .phase.done::after{content:"✓";position:absolute;top:-6px;right:-2px;font-size:10px;background:var(--mint-deep);color:#fff;border-radius:50%;width:14px;height:14px;line-height:14px}
   .stage{padding:16px 22px 26px}
-  .dialogue{display:flex;gap:14px;align-items:flex-start;background:#fdf3fa;border:2px solid #ffe4f2;border-radius:20px;padding:14px 16px;height:158px}
+  .dialogue{display:flex;gap:14px;align-items:flex-start;background:#fdf3fa;border:2px solid #ffe4f2;border-radius:20px;padding:14px 16px 40px;height:172px}
   .avatar{flex:0 0 62px;width:62px;height:62px;border-radius:18px;background:#fff;box-shadow:0 6px 14px -8px var(--shadow);overflow:hidden;border:2px solid #fff}
   .avatar svg{width:100%;height:100%;display:block}
   .speech{flex:1;min-width:0}
@@ -92,7 +92,13 @@
   .speaker.penny{color:#4a7ab5} .speaker.miko{color:#c96a8a} .speaker.luna{color:#b87ad0}
   .speaker.torto{color:#6a9a5a} .speaker.dragon{color:#d04a6a}
   .speaker.hana{color:#e0709a} .speaker.sakura{color:#b5852a}
-  .text{font-size:15.5px;line-height:1.5;height:104px;overflow-y:auto;cursor:pointer;padding-right:6px;scrollbar-width:thin}
+  .text{font-size:15.5px;line-height:1.5;height:6em;overflow:hidden;cursor:pointer;padding-right:6px}
+  .text .more{display:inline-block;color:var(--pink-deep);font-weight:800;animation:blink 1s steps(1) infinite;margin-left:4px}
+  .dialogue{position:relative}
+  .nextbtn{position:absolute;right:12px;bottom:10px;font-family:'Baloo 2';font-weight:800;font-size:12.5px;
+    color:#fff;background:linear-gradient(135deg,var(--lav-deep),var(--pink-deep));border:none;border-radius:12px;
+    padding:6px 13px;cursor:pointer;box-shadow:0 5px 12px -6px var(--lav-deep);z-index:2}
+  .nextbtn:hover{transform:translateY(-1px)}
   .narration{display:none;font-style:italic;color:var(--ink-soft);font-size:13px;line-height:1.5;background:#faf6ff;border-left:3px solid var(--lav);padding:8px 13px;border-radius:0 13px 13px 0;margin-top:10px}
   .text .cursor{display:inline-block;width:8px;background:var(--pink-deep);animation:blink 1s steps(1) infinite;color:transparent}
   @keyframes blink{50%{opacity:0}}
@@ -110,6 +116,24 @@
   .crow{display:flex;align-items:center;gap:12px;margin:8px 0}
   .crow .cthink{flex:1 1 auto;text-align:right;font-style:italic;font-size:13px;color:var(--ink-soft);line-height:1.35}
   .crow .cact{flex:0 0 auto;align-self:center;white-space:normal;max-width:50%;text-align:center;font-size:14px;padding:11px 18px}
+  @media(max-width:600px){
+    body{padding:8px}
+    .game{border-radius:20px}
+    .scene{height:200px}
+    .stage{padding:12px 12px 18px}
+    .dialogue{gap:10px;padding:10px 12px 40px;height:auto;min-height:150px}
+    .avatar{flex:0 0 50px;width:50px;height:50px;border-radius:14px}
+    .text{font-size:14.5px}
+    .speaker{font-size:13px}
+    .btn{padding:10px 18px;font-size:14px}
+    .tracker{gap:3px;padding:8px 8px 2px}
+    .phase{min-width:56px;font-size:9px;padding:5px 2px}
+    .chapter-banner{font-size:12.5px;padding:8px 10px}
+    .narration{font-size:12.5px}
+    .choice{font-size:13.5px;padding:10px 12px}
+    .note-badge,.day-badge{font-size:11px;padding:5px 10px}
+    .nextbtn{right:8px;bottom:8px}
+  }
   @media(max-width:560px){
     .crow{flex-direction:column;align-items:stretch;gap:5px}
     .crow .cthink{text-align:left}
@@ -339,7 +363,7 @@
   .intro-hero{position:fixed;inset:0;z-index:60;overflow-y:auto;
     background:linear-gradient(180deg,#ffeaf6 0%,#f4ecff 55%,#e7ecff 100%);
     display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start}
-  .ih-factory-top{width:100%;height:clamp(118px,24vh,220px);overflow:hidden;pointer-events:none;
+  .ih-factory-top{width:100%;height:clamp(200px,42vh,480px);overflow:hidden;pointer-events:none;
     border-bottom:3px solid #ffd1e6;background:linear-gradient(180deg,#ffe1ef,#d9ecff)}
   .ih-factory-top svg{width:100%;height:100%;display:block}
   .ih-content{flex:1 0 auto;position:relative;display:flex;flex-direction:column;
@@ -400,6 +424,7 @@
             <div class="speaker" id="speaker"></div>
             <div class="text" id="text"></div>
           </div>
+          <button class="nextbtn" id="nextbtn" style="display:none">Next ▸</button>
         </div>
         <div class="interact" id="interact"></div>
       </div>
@@ -1400,20 +1425,82 @@ function sorterUI(cfg){
 }
 
 let typeTimer=null;
+/* ---- sentence-aware pagination: the text window never scrolls ---- */
+function splitSentences(t){
+  const out=[]; let cur='';
+  const closers='"”’)\]」』）';
+  const abbr=/(?:^|\s)(Mr|Ms|Mrs|Dr|St|No|vs|etc|e\.g|i\.e)\.$/;
+  for(let i=0;i<t.length;i++){
+    const ch=t[i]; cur+=ch;
+    const isJ='。！？'.includes(ch), isW='.!?…'.includes(ch);
+    if(!(isJ||isW)) continue;
+    let j=i+1;
+    while(j<t.length && closers.includes(t[j])){ cur+=t[j]; j++; }
+    const atEnd=j>=t.length, nxt=t[j]||'';
+    if(isJ || atEnd || /\s/.test(nxt)){
+      if(isW && !atEnd && abbr.test(cur.trim())){ i=j-1; continue; }
+      while(j<t.length && /\s/.test(t[j])){ cur+=t[j]; j++; }
+      out.push(cur); cur=''; i=j-1;
+    } else { i=j-1; }
+  }
+  if(cur) out.push(cur);
+  return out;
+}
+function paginate(el,text){
+  const sents=splitSentences(text);
+  const fits=str=>{ el.innerHTML=str+'<span class="more">▼</span>'; return el.scrollHeight<=el.clientHeight+2; };
+  const pages=[]; let cur='';
+  const pushWords=(chunk)=>{
+    const words=chunk.split(/(\s+)/); let c=cur;
+    for(const w of words){ if(!w) continue; const trial=c+w;
+      if(fits(trial)||!c.trim()) c=trial; else { pages.push(c.trim()); c=w.trimStart(); } }
+    cur=c;
+  };
+  for(const sn of sents){
+    const trial=cur+sn;
+    if(fits(trial)) cur=trial;
+    else if(!cur.trim()) pushWords(sn);
+    else { pages.push(cur.trim()); if(fits(sn)) cur=sn; else { cur=''; pushWords(sn); } }
+  }
+  if(cur.trim()) pages.push(cur.trim());
+  el.innerHTML='';
+  return pages.length?pages:[''];
+}
+window.__paginate=paginate; window.__splitSentences=splitSentences;
+
 function say(speaker, cls, text, cb, mood){
   const [base,inlineMood]=(cls||'narr').split(':');
   $('avatar').innerHTML = (base==='narr')?ART.narr:artHTML(base,mood||inlineMood);
   $('speaker').textContent = speaker; $('speaker').className='speaker '+base;
-  const el=$('text'); el.innerHTML=''; clearInterval(typeTimer);
-  let i=0;
-  typeTimer=setInterval(()=>{
-    const ch=text[i-1];
-    if(i%3===1 && ch && !/[\s、。，．！？…「」『』（）()【】・\-—*.,!?"'’“”:;]/.test(ch)) blip(base);   // speech blabber (letters, digits AND Japanese kana/kanji)
-    el.innerHTML=text.slice(0,i)+'<span class="cursor">|</span>'; i++;
-    el.scrollTop=el.scrollHeight;                             // keep typing in view (box is fixed-size)
-    if(i>text.length){clearInterval(typeTimer);el.innerHTML=text;if(cb)cb();}
-  },13);
-  el.onclick=()=>{clearInterval(typeTimer);el.innerHTML=text;if(cb){const f=cb;cb=null;f();}};
+  const el=$('text'); clearInterval(typeTimer);
+  const nb=$('nextbtn'); if(nb){ nb.style.display='none'; nb.textContent=L('Next ▸','次へ ▸'); }
+  const pages=paginate(el,text);
+  let pi=0, i=0, typing=false;
+  function finishPage(){
+    clearInterval(typeTimer); typing=false;
+    const last=pi>=pages.length-1;
+    el.innerHTML=pages[pi]+(last?'':'<span class="more">▼</span>');
+    if(last){ if(cb){ const f=cb; cb=null; f(); } }
+    else if(nb) nb.style.display='inline-block';
+  }
+  function startPage(){
+    if(nb) nb.style.display='none';
+    i=0; typing=true; el.innerHTML='';
+    const pg=pages[pi];
+    typeTimer=setInterval(()=>{
+      const ch=pg[i-1];
+      if(i%3===1 && ch && !/[\s、。，．！？…「」『』（）()【】・\-—*.,!?"'’“”:;]/.test(ch)) blip(base);   // speech blabber
+      el.innerHTML=pg.slice(0,i)+'<span class="cursor">|</span>'; i++;
+      if(i>pg.length) finishPage();
+    },13);
+  }
+  function advance(){
+    if(typing){ finishPage(); return; }
+    if(pi<pages.length-1){ pi++; startPage(); }
+  }
+  el.onclick=advance;
+  if(nb) nb.onclick=advance;
+  startPage();
 }
 function interact(html){ $('interact').innerHTML=html; }
 function banner(txt){ const b=$('banner'); if(!txt){b.style.display='none';return;} b.style.display='block'; b.textContent=txt; }
@@ -1759,7 +1846,7 @@ title(){
   const spark=['✦','✧','🧸','💖','🌟','✦','✧','🩷'].map((s,i)=>`<span class="sparkle" style="top:${5+Math.random()*84}%;left:${3+Math.random()*92}%;animation-delay:${(i*0.3).toFixed(2)}s;font-size:${14+Math.random()*12}px">${s}</span>`).join('');
   const cast=['uni','capy','penny','miko','dragon'].map(id=>`<div class="ih-av">${ART[id]||''}</div>`).join('');
   document.body.insertAdjacentHTML('beforeend',`<div class="intro-hero" id="introhero">
-    <div class="ih-factory-top">${bgFactory().replace('xMidYMid slice','xMidYMax meet')}</div>
+    <div class="ih-factory-top">${bgFactory().replace('xMidYMid slice','xMidYMax slice').replace('viewBox="0 0 800 250"','viewBox="0 -90 800 340"').replace('<rect width="800" height="250" fill="url(#sky)"/>','<rect y="-90" width="800" height="340" fill="url(#sky)"/>')}</div>
     <div class="ih-content">
       ${spark}
       <div class="ih-mascot">${MOCHI_HERO}</div>

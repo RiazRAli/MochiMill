@@ -179,6 +179,11 @@
   .chip.dragging{opacity:.45;border-style:dashed}
   .sipoc-col.dragover{border-color:var(--pink-deep);background:#fff5fa;box-shadow:0 0 0 3px #ffd7e8}
   .stake-status{font-size:10.5px;font-weight:700;margin-top:2px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .grid2 .sipoc-col h5 small{display:block;font-weight:500;color:var(--ink-soft);font-size:10px}
+  .axis{font-size:11px;color:var(--ink-soft);text-align:center;font-weight:700;letter-spacing:.3px}
+  .scope-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+  @media(max-width:640px){.scope-grid{grid-template-columns:1fr}}
   .stake-status.ok{color:#2f8f66}.stake-status.warn{color:#c48a3a}
   table.hoq{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
   table.hoq th{background:#efe8fc;color:var(--lav-deep);padding:6px 7px;text-align:center;font-family:'Baloo 2';font-size:11px;border:1.5px solid #e0d6f5}
@@ -209,6 +214,7 @@
   .person{display:flex;gap:10px;align-items:center;background:#fff;border:2px solid #ffdcec;border-radius:16px;padding:10px 12px;cursor:pointer;transition:.18s;box-shadow:0 4px 0 #ffe3f0}
   .person:hover{transform:translateY(-2px);border-color:var(--pink)}
   .person.done-p{opacity:.5;pointer-events:none}
+  .person.locked-p{opacity:.5;filter:grayscale(.85)}
   .person .pav{width:46px;height:46px;border-radius:13px;overflow:hidden;flex:0 0 46px;background:#fdf3fa}
   .person .pav svg{width:100%;height:100%}
   .person .pn{font-family:'Baloo 2';font-weight:700;font-size:14px}
@@ -426,6 +432,8 @@ const S = {
   sipoc:{S:[],I:[],O:[],C:[],X:[]},
   voc:{voc:[],noise:[]},
   ctq:{},
+  scope:{IN:[],OUT:[],LATER:[]},
+  stake:{MC:[],KS:[],KI:[],MO:[]},
   vocGame:null,                      // ctq translations chosen: {smile:'ok|vague|sol', ship:...}
   vocDone:false,sipocDone:false,flowDone:false,psDone:false,objDone:false,
   tollgateAttempts:0,
@@ -547,6 +555,7 @@ const CARDS = {
   p_when:{txt:'QA trend chart: the failure rate jumped on March 14th — the exact day the spike began — and has stayed high since.',src:'Penny Penguin, QA trend chart',type:'ver',slot:'when'},
   p_field:{txt:'Escaped-defect rate: about 4.8% of SHIPPED plushies come back broken within a month — roughly 1 in 20 reaches a child defective. That is the rate the customer actually feels (a healthy line runs under 0.5%). Very different from the 12.6% caught at the gate.',src:'Penny Penguin, QA logs cross-checked with Miko’s returns',type:'ver',slot:'mag'},
   p_cause:{txt:'If you want my hunch: thread tension is behind it. But that is a guess — my logs record WHAT failed, not WHY.',src:'Penny Penguin (unproven cause hypothesis)',type:'cause',slot:null},
+  m_shops:{txt:'Which shops complain: the Sakura Toy Emporium is loudest — Ms. Sakura counts broken ARRIVALS and RETURNS separately. She is the retailer to invite to the VOC session.',src:'Miko Cat, customer care',type:'fact',slot:null},
   m_impact:{txt:'COPQ (Cost of Poor Quality): refunds tripled to 48,000 gold last quarter, and two toy shops paused orders.',src:'Miko Cat, customer care ledger',type:'ver',slot:'impact'},
   m_ctq:{txt:'Customers’ #1 need: a smile that survives 1,000 hugs. That is what quality means to them.',src:'Miko Cat, voice of the customer',type:'fact',slot:null},
   m_voc:{txt:'Letter #112: "My daughter cried — the smile came undone after ONE week of hugs."',src:'Customer letter, via Miko',type:'fact',slot:null},
@@ -645,6 +654,41 @@ const PSF={
   ],
 };
 
+/* ---------------- scope items (In / Out / Parking lot) ---------------- */
+const SCOPE_ITEMS=[
+  {en:'The main stitching line, receiving → shipping',ja:'メインの縫製ライン（受入→出荷）',k:'IN'},
+  {en:'The smile-stitching step and Machine 3',ja:'笑顔ステッチ工程とマシン3',k:'IN'},
+  {en:'Final inspection at the gate',ja:'出荷前の最終検査',k:'IN'},
+  {en:'Cutting-station rework',ja:'裁断工程の手戻り',k:'IN'},
+  {en:'Toy-shop returns — as our field data',ja:'おもちゃ店からの返品——現場データとして',k:'IN'},
+  {en:'Buying the TurboStitch 9000',ja:'ターボステッチ9000の購入',k:'OUT',trap:'solution'},
+  {en:'Disciplining the night shift',ja:'夜勤への処分',k:'OUT',trap:'blame'},
+  {en:'The whole factory’s morale',ja:'工場全体の士気',k:'OUT',trap:'creep'},
+  {en:'How the Fluff Farm Co-op harvests fluff',ja:'フラッフ農園協同組合の収穫方法',k:'OUT',trap:'creep'},
+  {en:'The toy shops’ shelf displays',ja:'おもちゃ店の陳列方法',k:'OUT',trap:'creep'},
+  {en:'Proving what causes the tension drift',ja:'張力ドリフトの原因の立証',k:'LATER'},
+  {en:'Fixing the humid-week effect',ja:'湿度の高い週の影響の解決',k:'LATER'},
+];
+const SCOPE_COLS=[['IN','In scope','対象範囲内'],['OUT','Out of scope','対象範囲外'],['LATER','Parking lot — later phase','保留——後のフェーズ']];
+
+/* ---------------- stakeholder grid (power × interest) ---------------- */
+const STAKE_ITEMS=[
+  {id:'empress',en:'Empress Scarlet — Champion',ja:'スカーレット皇帝——チャンピオン',k:'MC'},
+  {id:'sakura', en:'Ms. Sakura — Toy Emporium (can pause orders)',ja:'サクラ店主——百貨店（発注停止の権限あり）',k:'MC',need:'m_shops'},
+  {id:'capy',   en:'Captain Capy — process owner',ja:'カピー——工程オーナー',k:'MC'},
+  {id:'acct',   en:'Accounting — keepers of the COPQ ledger',ja:'経理部——COPQ台帳の管理者',k:'KS'},
+  {id:'hana',   en:'Hana and the children',ja:'ハナと子どもたち',k:'KI'},
+  {id:'ops',    en:'Torto & Luna — the operators',ja:'トルトとルナ——作業員たち',k:'KI'},
+  {id:'miko',   en:'Miko — customer care',ja:'ミコ——カスタマーケア',k:'KI'},
+  {id:'fluff',  en:'Fluff Farm Co-op — supplier',ja:'フラッフ農園協同組合——供給者',k:'MO'},
+  {id:'thread', en:'Rainbow Thread Guild — supplier',ja:'レインボー糸ギルド——供給者',k:'MO'},
+  {id:'brk',    en:'The break-room philosophers',ja:'休憩室の哲学者たち',k:'MO'},
+];
+const STAKE_COLS=[['MC','Manage closely','綿密に管理','high power · high interest','権限 高・関心 高'],
+                  ['KS','Keep satisfied','満足させておく','high power · low interest','権限 高・関心 低'],
+                  ['KI','Keep informed','情報を共有','low power · high interest','権限 低・関心 高'],
+                  ['MO','Monitor','見守る','low power · low interest','権限 低・関心 低']];
+
 /* ---------------- objective statement fragments ---------------- */
 const OBJ={
   verb:[{t:'Reduce',v:'ok'},{t:'Completely eliminate, forever,',v:'unreal',need:'br_zero'},{t:'Look into',v:'vague',need:'br_lookinto'}],
@@ -681,6 +725,30 @@ const HELP = {
       a:'I run a slice of the night, not the whole daytime sequence end to end. Ask someone who works the full line in daylight.',
       cards:[]},
   ]},
+  scope:{ title:'the scope — what is inside the boundary, what is not', q:[
+    {who:'Captain Capy', cls:'capy', mood:null,
+      ask:'“Where does OUR process begin and end?”',
+      a:'Receiving dock to the shipping door — the eight blocks you mapped. What the farm does before the fluff arrives, or what the shops do after the boxes leave, that is their house, not ours.',
+      cards:[]},
+    {who:'Penny Penguin', cls:'penny', mood:'stern',
+      ask:'“Are the toy-shop returns inside our scope?”',
+      a:'The DATA is — it measures what our process shipped. The shops’ shelves and staff are not. Scope the measurement, not the retailer.',
+      cards:[]},
+    {who:'Torto', cls:'torto', mood:'content',
+      ask:'“Is buying the TurboStitch part of this project?”',
+      a:'*sips* A purchase is a DECISION, youngster, not a boundary. Decide later, with numbers. …Page forty-seven will still be there.',
+      cards:[]},
+  ]},
+  stake:{ title:'the stakeholder grid — power and interest', q:[
+    {who:'Uni the Unicorn', cls:'uni', mood:'stern',
+      ask:'“How do I place someone on the grid?”',
+      a:'Two questions per name. Can they change the project’s fate — funding, orders, approvals? That is POWER. Will they feel the result — good or bad? That is INTEREST. High/high: manage closely. Power without interest: keep satisfied. Interest without power: keep informed. Neither: monitor.',
+      cards:[]},
+    {who:'Miko Cat', cls:'miko', mood:'dramatic',
+      ask:'“How much power does the Emporium really have?”',
+      a:'Nya — they PAUSED orders once already! One letter from Ms. Sakura and Accounting turns pale. That is power, and she cares about every box. Do not file her under “monitor”, whatever you do.',
+      cards:['m_shops']},
+  ]},
   sipoc:{ title:'the SIPOC — suppliers, inputs, outputs, customers', q:[
     {who:'Captain Capy', cls:'capy', mood:null,
       ask:'“Who supplies us, and who receives the plushies?”',
@@ -701,9 +769,9 @@ const HELP = {
   ]},
   voc:{ title:'the Voice of the Customer — what customers actually need', q:[
     {who:'Miko Cat', cls:'miko', mood:'dramatic',
-      ask:'“What are customers actually telling you they need?”',
-      a:'*produces a stack of letters* Letter #112: a child cried when the smile came undone after ONE week. A thousand hugs, minimum — THAT is the need. And the Sakura Toy Emporium wants shipments where every plushie is sellable. Real voices, nya. Use them.',
-      cards:['m_voc','m_ctq'], unlockVoc:true},
+      ask:'“What are customers — and which shops — actually telling you they need?”',
+      a:'*produces a stack of letters* Letter #112: a child cried when the smile came undone after ONE week. A thousand hugs, minimum — THAT is the need. And the loudest shop is the Sakura Toy Emporium: Ms. Sakura counts broken arrivals AND returns, and she wants every shipped plushie sellable. Real voices, nya. Use them — she will be at your VOC session now that you know her name.',
+      cards:['m_voc','m_ctq','m_shops'], unlockVoc:true},
     {who:'Penny Penguin', cls:'penny', mood:'stern',
       ask:'“Do your logs tell me what customers want?”',
       a:'My logs tell you what FAILED inspection. What customers WANT is a different question, and not one my binders answer. Ask Miko — she reads the letters.',
@@ -1081,6 +1149,8 @@ window.__artMoodFail=(el,id)=>{ el.onerror=()=>window.__artFail(el,id); el.src=`
 const $ = id=>document.getElementById(id);
 /* ---- project deadline countdown ---- */
 const DEADLINE_DAYS=90;
+const DEFINE_DAYS=10;          // the Empress allows ten days for DEFINE (incl. the review)
+function defineLate(){ return daysUsed()>DEFINE_DAYS; }
 function daysUsed(){ return Math.max(0,(S.day-1)) + (S.half?0.5:0) + (S.daysLost||0); }
 function daysLeft(){ return Math.max(0, DEADLINE_DAYS - daysUsed()); }
 function fmtDays(n){ return (Math.round(n*2)/2).toString(); }
@@ -1089,8 +1159,11 @@ function dayLabel(){
   const col = left<20?'#d81b60':(left<45?'#e07b1a':'#5a8a3a');
   const slipEn=S.daysLost?` <span style="color:#e05;font-weight:700">(−${S.daysLost}d slips)</span>`:'';
   const slipJa=S.daysLost?` <span style="color:#e05;font-weight:700">（遅れ −${S.daysLost}日）</span>`:'';
-  return L(`⏳ <b style="color:${col};font-size:15px">${fmtDays(left)}</b> / ${DEADLINE_DAYS} days left${slipEn}`,
-           `⏳ 残り <b style="color:${col};font-size:15px">${fmtDays(left)}</b> / ${DEADLINE_DAYS}日${slipJa}`); }
+  const dU=daysUsed(), dcol=dU>DEFINE_DAYS?'#d81b60':(dU>DEFINE_DAYS-2?'#e07b1a':'#5a8a3a');
+  const defEn=` · <span style="color:${dcol};font-weight:800">Define day ${fmtDays(dU)}/${DEFINE_DAYS}</span>`;
+  const defJa=` · <span style="color:${dcol};font-weight:800">Define ${fmtDays(dU)}/${DEFINE_DAYS}日目</span>`;
+  return L(`⏳ <b style="color:${col};font-size:15px">${fmtDays(left)}</b> / ${DEADLINE_DAYS} days left${slipEn}${defEn}`,
+           `⏳ 残り <b style="color:${col};font-size:15px">${fmtDays(left)}</b> / ${DEADLINE_DAYS}日${slipJa}${defJa}`); }
 function tickHalfDay(){ S.half++; if(S.half>1){S.half=0;S.day++;} }
 function drawScene(){
   $('scene').classList.remove('cine');
@@ -1284,6 +1357,48 @@ function dragonReact(beatsHtml){
   else { setDragonMood('approving'); setPlayerMood('determined'); }
 }
 
+
+/* ---------- generic drag/tap sorter used by Scope and Stakeholders ---------- */
+function sorterUI(cfg){
+  /* cfg: {state, items, cols:[[key,labelEn,labelJa,subEn,subJa]], gridClass, lockId, lockLabel(en,ja), onLock, help} */
+  const st=cfg.state;
+  function render(){
+    const placed=new Set(cfg.cols.flatMap(c=>st[c[0]]));
+    const avail=i=>!cfg.items[i].need||S.have.includes(cfg.items[i].need);
+    const nAvail=cfg.items.filter((it,i)=>avail(i)).length;
+    const colHtml=k=>st[k].map(i=>`<div class="placed-chip" data-rm="${i}" data-col="${k}">${L(cfg.items[i].en,cfg.items[i].ja)} ✕</div>`).join('');
+    const cols=cfg.cols.map(c=>`<div class="sipoc-col" data-col="${c[0]}"><h5>${L(c[1],c[2])}${c[3]?`<small>${L(c[3],c[4])}</small>`:''}</h5>${colHtml(c[0])}</div>`).join('');
+    const complete=placed.size>=nAvail;
+    interact((cfg.axes||'')+`<div class="${cfg.gridClass}">${cols}</div>
+      <div class="chip-pool" id="pool">${cfg.items.map((it,i)=>(placed.has(i)||!avail(i))?'':`<div class="chip" data-i="${i}" draggable="true">${L(it.en,it.ja)}</div>`).join('')}</div>
+      <div class="hint">${L('Drag each item into place (or tap an item, then tap a box).','各項目をドラッグして配置（または項目をタップしてから枠をタップ）。')}</div>
+      <button class="btn" id="${cfg.lockId}">${complete?L(cfg.lockEn,cfg.lockJa):L(cfg.lockEn+' (items unsorted — risky)',cfg.lockJa+'（未分類あり——リスク）')}</button>`+(cfg.help?helpControl(cfg.help):''));
+    let sel=null, dragIdx=null;
+    document.querySelectorAll('.chip[data-i]').forEach(ch=>{
+      ch.onclick=()=>{ document.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel')); sel=+ch.dataset.i; ch.classList.add('sel');
+        document.querySelectorAll('.sipoc-col[data-col]').forEach(c=>c.classList.add('hl')); };
+      ch.addEventListener('dragstart',e=>{ dragIdx=+ch.dataset.i; ch.classList.add('dragging'); try{e.dataTransfer.setData('text/plain',String(dragIdx));}catch(_){ } });
+      ch.addEventListener('dragend',()=>{ document.querySelectorAll('.chip').forEach(x=>x.classList.remove('dragging')); document.querySelectorAll('.sipoc-col').forEach(c=>c.classList.remove('dragover')); });
+    });
+    document.querySelectorAll('.sipoc-col [data-rm]').forEach(pc=>{
+      pc.setAttribute('draggable','true');
+      pc.addEventListener('dragstart',e=>{ dragIdx=+pc.dataset.rm; const c=pc.dataset.col; st[c]=st[c].filter(x=>x!==dragIdx); try{e.dataTransfer.setData('text/plain',String(dragIdx));}catch(_){ } });
+      pc.addEventListener('dragend',()=>render());
+    });
+    document.querySelectorAll('.sipoc-col[data-col]').forEach(col=>{
+      col.addEventListener('dragover',e=>{ e.preventDefault(); col.classList.add('dragover'); });
+      col.addEventListener('dragleave',()=>col.classList.remove('dragover'));
+      col.addEventListener('drop',e=>{ e.preventDefault(); col.classList.remove('dragover'); if(dragIdx===null) return; st[col.dataset.col].push(dragIdx); dragIdx=null; render(); });
+      col.onclick=(e)=>{
+        if(e.target.dataset.rm!==undefined && e.target.dataset.col){ const i=+e.target.dataset.rm, c=e.target.dataset.col; st[c]=st[c].filter(x=>x!==i); render(); return; }
+        if(sel===null) return; st[col.dataset.col].push(sel); sel=null; render();
+      };
+    });
+    const lb=$(cfg.lockId); if(lb) lb.onclick=cfg.onLock;
+  }
+  render();
+}
+
 let typeTimer=null;
 function say(speaker, cls, text, cb, mood){
   const [base,inlineMood]=(cls||'narr').split(':');
@@ -1304,7 +1419,7 @@ function interact(html){ $('interact').innerHTML=html; }
 function banner(txt){ const b=$('banner'); if(!txt){b.style.display='none';return;} b.style.display='block'; b.textContent=txt; }
 function narrate(txt){ const n=$('narration'); if(!n) return; if(!txt){n.style.display='none';return;} n.style.display='block'; n.innerHTML='✦ '+txt; }
 
-const STEPS=[['🚀','Kickoff'],['🗣️','Interviews'],['🧱','Block Diagram'],['🗂️','SIPOC'],['💬','VOC'],['📝','Problem'],['🎯','Objective'],['🐉','Tollgate']];
+const STEPS=[['🚀','Kickoff'],['🗣️','Interviews'],['🧱','Block Diagram'],['🗂️','SIPOC'],['🧭','Scope'],['💬','VOC'],['🧩','Stakeholders'],['📝','Problem'],['🎯','Objective'],['🐉','Tollgate']];
 function renderTracker(step){
   $('tracker').innerHTML = STEPS.map((s,i)=>{
     let cls='phase'; if(i===step)cls+=' active'; else if(i<step)cls+=' done';
@@ -1375,6 +1490,52 @@ function evalTollgate(){
     if(S.ctq[k]==='vague' && !minor.includes('ctq_vague')) minor.push('ctq_vague');
   }
   if((!S.ctq.thread||!S.ctq.rework) && !minor.includes('voc_int_missed')) minor.push('voc_int_missed');
+  /* ---- SCOPE ---- */
+  {
+    const sc=S.scope||{IN:[],OUT:[],LATER:[]};
+    const placed={}; for(const col of ['IN','OUT','LATER']) sc[col].forEach(i=>placed[i]=col);
+    let coreOut=0, creepIn=0, contam=false, other=0, unplaced=0;
+    SCOPE_ITEMS.forEach((it,i)=>{
+      const col=placed[i];
+      if(!col){ unplaced++; return; }
+      if(col===it.k) return;
+      if(it.k==='IN') coreOut++;
+      else if(col==='IN' && (it.trap==='solution'||it.trap==='blame')) contam=true;
+      else if(col==='IN' && it.trap==='creep') creepIn++;
+      else other++;
+    });
+    if(unplaced>=SCOPE_ITEMS.length-2) crit.push('scope_incomplete');
+    else {
+      if(contam) crit.push('scope_contam');
+      if(creepIn>=2) crit.push('scope_creep'); else if(creepIn===1) other++;
+      if(coreOut>=2) crit.push('scope_core'); else if(coreOut===1) other++;
+      other+=unplaced;
+      if(other>=3) crit.push('scope_muddled'); else if(other>0) minor.push('scope_minor');
+    }
+  }
+  /* ---- STAKEHOLDERS ---- */
+  {
+    const st=S.stake||{MC:[],KS:[],KI:[],MO:[]};
+    const placed={}; for(const col of ['MC','KS','KI','MO']) st[col].forEach(i=>placed[i]=col);
+    let other=0, unplaced=0, nAvail=0;
+    STAKE_ITEMS.forEach((it,i)=>{
+      if(it.need && !S.have.includes(it.need)) return;
+      nAvail++;
+      const col=placed[i];
+      if(!col){ unplaced++; return; }
+      if(col===it.k) return;
+      if(it.id==='empress') crit.push('stake_empress');
+      else if((it.id==='sakura'||it.id==='hana') && col==='MO') crit.push('stake_customer');
+      else other++;
+    });
+    if(unplaced>=nAvail-2) crit.push('stake_incomplete');
+    else {
+      other+=unplaced;
+      if(other>=3) crit.push('stake_muddled'); else if(other>0) minor.push('stake_minor');
+    }
+  }
+  /* ---- SCHEDULE ---- */
+  if(defineLate() && !minor.includes('late')) minor.push('late');
   return {crit,minor,sipocErrs:errs};
 }
 window.__S=S; window.__eval=evalTollgate;
@@ -1388,6 +1549,18 @@ const LESSON={
   metric_mismatch:{t:'Baseline/target do not match the metric',d:'Your primary metric is the defect rate REACHING CUSTOMERS (baseline 4.8%, target ≤0.5%) — but a figure on your charter is the INSPECTION number (12.6% caught, 2% target). Those describe two different things. The baseline and target must measure the SAME dial as your primary metric, or the objective is incoherent. Use the escaped-defect figures throughout.'},
   metric_time:{t:'Speed is a guardrail, not the goal',d:'You chose THROUGHPUT — plushies shipped per day — as the primary metric. This project is about QUALITY. If you chase speed as the headline number, the fastest way to win is to skip checks and ship faster, sending even more defects out the door. Throughput belongs on the charter as a SECONDARY / guardrail metric — "improve quality without slowing the line" — so it protects against over-correcting. It must never be the primary. Capy means well, but leadership liking "fast" is exactly the trap.'},
   consulted:{t:'Asked for evidence mid-build',d:'Define runs in order: interview and gather FIRST, verify, and only then assemble the charter. Reaching out to an expert while you are already filling in blanks means the groundwork was rushed — it costs schedule time and it shows. Do the legwork up front and the deliverables almost build themselves; a flawless review is only possible when nothing had to be chased at the last minute.'},
+  scope_contam:{t:'A solution and/or blame written into the scope',d:'Scope is the boundary of the PROCESS you will study — not a shopping list and not a list of people to punish. "Buy the TurboStitch" is an Improve-phase decision the data has not earned; "discipline the night shift" is blame wearing a project badge. Both belong OUT of scope by definition.'},
+  scope_creep:{t:'Scope creep',d:'Morale of the whole factory, a supplier’s farming methods, a retailer’s shelf displays — each is a project of its own. Scope creep is how projects die politely: every extra boundary dilutes the team, the calendar and the data. Draw the line around ONE process: your block diagram, receiving to shipping.'},
+  scope_core:{t:'The core process is outside the scope',d:'The stitching line, the smile step, the inspection gate, the rework — these ARE the project. Putting them out of scope leaves you studying the edges of a problem instead of its heart. Your SIPOC already told you where the boundaries lie: first block to last block.'},
+  scope_muddled:{t:'Scope boundaries muddled',d:'Three or more items on the wrong side of the line. A good scope test: is it inside the block diagram? Then it is IN. Is it a fix or a culprit? OUT. Is it real work that belongs to Analyze or Improve? PARKING LOT — noted, not forgotten, not now.'},
+  scope_minor:{t:'A scope item on the wrong side',d:'Close. Re-check the borderline items: field data from returns is IN (it measures your output); proving causes and fixing effects wait for later phases; anything belonging to someone else’s process is OUT.'},
+  scope_incomplete:{t:'Scope left undefined',d:'A project without boundaries cannot be planned, staffed or finished. Sort every item — IN, OUT, or parked for later.'},
+  stake_empress:{t:'The Champion is not managed closely',d:'The Empress funds the project, removes barriers and closes every tollgate. High power, high interest — she belongs in MANAGE CLOSELY, always. Anywhere else and your sponsor learns about your project from rumors.'},
+  stake_customer:{t:'A customer filed under “monitor”',d:'Ms. Sakura can pause orders — that is power. Hana and the children are the reason the project exists — that is interest. Customers are never merely monitored: they are managed closely or, at the least, kept informed.'},
+  stake_muddled:{t:'Stakeholder grid muddled',d:'Ask two questions of each name: can they CHANGE the project’s fate (power)? Do they CARE about its outcome (interest)? High/high → manage closely. High power, low interest → keep satisfied. Low power, high interest → keep informed. Low/low → monitor.'},
+  stake_minor:{t:'A stakeholder in the wrong quadrant',d:'Nearly right. Suppliers with no stake in the outcome are monitored; operators and care staff who live with the results are kept informed; the treasury is kept satisfied.'},
+  stake_incomplete:{t:'Stakeholders left unplaced',d:'Every name on the board is someone who can help or hurt this project. Place them all — the grid IS the communication plan.'},
+  late:{t:'Define ran over its allotment',d:'The Empress granted ten days for Define. Every chased signature, every mid-build consult, every rebuilt conversation costs calendar. Discipline in Define is what buys you time in Analyze — the phase that actually needs it.'},
   flow:{t:'Block diagram out of order',d:'A block diagram must mirror the real line, step by step. When it does not, every later analysis points at the wrong places. The fix is simple: ask the people who live on the floor — Torto can recite the true order from forty years of memory (receive → cut → sew → stuff → stitch smile → close seam → inspect → ship).'},
   sipoc:{t:'SIPOC columns mixed up',d:'Remember the flow of the letters: Suppliers provide the Inputs, the Process transforms them into Outputs, and Customers receive those outputs. Attitudes, moon phases and machines you might someday buy are none of these — they go in the bin.'},
   sipoc_minor:{t:'A few SIPOC items misplaced',d:'Almost right — re-check each item by asking: does someone SUPPLY it, is it fed INTO the process, does the process PRODUCE it, or does someone RECEIVE it?'},
@@ -1415,6 +1588,19 @@ const LESSON={
   obj_unreal:{t:'Target not achievable',d:'"Zero forever" sounds noble but excuses failure in advance — nobody is accountable to an impossible number. Stretch targets must remain reachable: a ≤0.5% escaped-defect rate is ambitious but real.'},
   obj_vague:{t:'Objective wording too fuzzy',d:'"Look into the wonkiness" has no edges. Use the precise metric — the defect rate reaching customers — so success is unambiguous.'},
 };
+function reviewSorter(items,cols,state){
+  const placed={}; cols.forEach(c=>state[c[0]].forEach(i=>placed[i]=c[0]));
+  const colName=k=>{const c=cols.find(x=>x[0]===k); return c?L(c[1],c[2]):'—';};
+  return `<div class="preview" style="font-size:12.5px"><b>${L('Under review','審査中')}</b><br>`+
+    items.map((it,i)=>{ if(it.need&&!S.have.includes(it.need)) return ''; const col=placed[i]; const ok=col===it.k;
+      return `${ok?'✓':'✗'} ${L(it.en,it.ja)} <small style="color:${ok?'#2f8f66':'#c04a60'}">→ ${col?colName(col):L('unplaced','未配置')}${ok?'':' ('+L('should be','正解：')+' '+colName(it.k)+')'}</small>`; }).filter(Boolean).join('<br>')+`</div>`;
+}
+function scheduleNote(){
+  const d=fmtDays(daysUsed());
+  return defineLate()
+    ? `<div class="feedback badf">⏳ ${L(`Day ${d}. The Empress allowed ${DEFINE_DAYS}. She glances at the calendar before she glances at you.`,`${d}日目。皇帝が許したのは${DEFINE_DAYS}日。彼女はきみを見る前に、暦を見る。`)}</div>`
+    : `<div class="feedback good">⏳ ${L(`Day ${d} of ${DEFINE_DAYS}. On schedule — she notices that too.`,`${DEFINE_DAYS}日のうち${d}日目。予定どおり——それも彼女は気づいている。`)}</div>`;
+}
 function coach(flag){ const L=LESSON[flag]; return L?`<div class="feedback info">📘 <b>Uni leans over, quietly:</b> ${L.d}</div>`:''; }
 
 /* ---------- tollgate deliverable renders (with the flawed bits highlighted) ---------- */
@@ -1463,10 +1649,10 @@ const IVQS={
     {k:'m1',mood:'delighted',q:'What matters most to the customers, in their own words?',cards:['m_ctq'],voc:true,
      a:'One thing: the smile must survive the hugs. A thousand hugs, minimum! A little girl told me that herself, deadly serious. That is what quality MEANS out there. Everything else is negotiable.'},
     {k:'m3',mood:'dramatic',req:['m1'],q:'Can I read those complaints myself — the actual letters?',cards:['m_voc'],voc:true,
-     a:'*shoves a stack of letters at you* Letter one-one-two. "My daughter cried — the smile came undone after ONE week of hugs." And the Sakura Toy Emporium keeps writing: "we need shipments where every plushie is sellable." Take them. Please. I have them memorized.'},
+     a:'*shoves a stack of letters at you* Letter one-one-two. "My daughter cried — the smile came undone after ONE week of hugs." And the shops keep writing: "we need shipments where every plushie is sellable." Take them. Please. I have them memorized.'},
     {k:'m2',mood:'dramatic',q:'What is this problem costing the business?',cards:['m_impact'],
-     a:'Accounting has a name for it — COPQ, the Cost of Poor Quality. Ours has TRIPLED: forty-eight thousand gold in refunds last quarter, and two toy shops have paused their orders. If the Sakura Toy Emporium walks, we are in real trouble, nya.'},
-    {k:'m6',mood:'dramatic',req:['m2'],q:'Which shops are pausing orders — and why exactly?',cards:[],
+     a:'Accounting has a name for it — COPQ, the Cost of Poor Quality. Ours has TRIPLED: forty-eight thousand gold in refunds last quarter, and two toy shops have paused their orders. If our biggest shop walks, we are in real trouble, nya.'},
+    {k:'m6',mood:'dramatic',req:['m2'],q:'Which shops are pausing orders — and why exactly?',cards:['m_shops'],
      a:'The Sakura Toy Emporium is the loudest, nya — Ms. Sakura counts every broken arrival AND every plushie her little shoppers bring back. Two different wounds, she says. If your VOC session ever happens, she is the one to press for numbers.'},
     {k:'m4',mood:'delighted',q:'Do you have ideas for how to fix it?',cards:['m_sol'],
      a:'Ooh ooh — we ship free repair kits with every plushie! Needle, thread, tiny instructions! And Sales keeps suggesting DISCOUNTS on the wonky ones, nya — over my whiskers! …What? Why are you looking at me like that? The repair kits are a GREAT idea.'},
@@ -1667,8 +1853,8 @@ kick1(){
 kick2(){
   renderTracker(0); drawBackdrop('scene_floor');
   say(nm('Uni the Unicorn'),'uni',
-    L('Welcome! I am Uni, Master Black Belt and your mentor. Empress Scarlet — our Champion, a dragon with zero patience for fluffy thinking — has given us ONE week to complete the DEFINE phase and pass her tollgate. Fail, and the project is shelved.',
-      'ようこそ！わたしはユニ、マスターブラックベルトで、きみの指導役。スカーレット皇帝——わたしたちのチャンピオンで、ふわっとした考えには一切容赦しない竜——が、DEFINE（定義）フェーズを終えてトールゲートを通すのに「1週間」だけくれた。落ちれば、このプロジェクトは棚上げだよ。'),()=>{
+    L('Welcome! I am Uni, Master Black Belt and your mentor. Empress Scarlet — our Champion, a dragon with zero patience for fluffy thinking — has given us TEN DAYS to complete the DEFINE phase and pass her tollgate. Fail, and the project is shelved.',
+      'ようこそ！わたしはユニ、マスターブラックベルトで、きみの指導役。スカーレット皇帝——わたしたちのチャンピオンで、ふわっとした考えには一切容赦しない竜——が、DEFINE（定義）フェーズを終えてトールゲートを通すのに「10日」だけくれた。落ちれば、このプロジェクトは棚上げだよ。'),()=>{
     addCards(['c_deadline']);
     interact(`<div class="feedback info">📜 <b>${L('Your Define deliverables:','きみのDefine成果物：')}</b> ${L('a block diagram of the process, a SIPOC, a Voice-of-the-Customer table with CTQs, a problem statement, and an objective statement. At the tollgate, Empress Scarlet will challenge every word.','工程のブロック図、SIPOC、CTQ付きの顧客の声（VOC）表、問題記述、目標記述。トールゲートでは、スカーレット皇帝が一言一句を問い詰めてくる。')}</div>
       <div class="feedback tip">📒 ${L('The charter brief goes in your notebook — including the one number the Empress underlined herself:','チャーター概要はノートに入る——皇帝が自ら下線を引いた、あの数字も含めて：')} <b>${L('results within 90 days','90日以内に結果を')}</b>.</div>
@@ -1845,10 +2031,8 @@ ledger(){
   if(g.capyBeat===undefined){ g.capyBeat=0; g.mikoBeat=0; }
   render();
   function payWrong(){
-    if(qLeft()>0){ S.qUsed=Math.min(S.qUsed+2,QBUDGET);
-      return L('The stopwatch eats two ticks.','ストップウォッチが2目盛り進む。'); }
-    S.daysLost+=1;
-    return L('The stopwatch is already spent — it costs a full DAY instead.','ストップウォッチはもう尽きている——代わりに丸1日を失う。');
+    tickHalfDay();
+    return L('Half a day burns while the chain is rebuilt.','連鎖を組み直す間に、半日が燃える。');
   }
   function resetChain(){ g.signed=false; g.released=false; g.capyBeat=0; g.mikoBeat=0; }
   function flub(who,cls,lineEn,lineJa,noteEn,noteJa){
@@ -1868,8 +2052,8 @@ ledger(){
     const mikoState=g.released?'done':(g.signed?'ready':'locked');
     const pennyState=g.done?'done':(g.released?'ready':'locked');
     const html=
-      `<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">${stopwatchSVG(qLeft()/QBUDGET,44)}
-        <span class="hint" style="text-align:left">${L('One wrong word at ANY door rewinds the whole chase and burns time. Choose like it matters.','どの扉でも一言間違えれば、追跡はすべて巻き戻り、時間が燃える。慎重に。')}</span></div>`+
+      `<div class="patience" style="margin-bottom:6px">${dayLabel()}</div>
+      <div class="hint" style="text-align:left;margin-bottom:6px">${L('One wrong word at ANY door rewinds the whole chase and costs half a day of the Define calendar — never your interview questions.','どの扉でも一言間違えれば追跡はすべて巻き戻り、Defineの暦から半日が消える——聞き取りの質問数は減らない。')}</div>`+
       (msg||'')+
       stepCard('capy','capy',nm('Captain Capy'),
         g.signed?L('✔ Signed the data-release form — name and all.','✔ データ開示書類にサイン済み——名前入りで。')
@@ -2088,7 +2272,7 @@ reconcile(){
         `<div class="feedback tip">${L(`${wrong.length} figure${wrong.length===1?'':'s'} still mis-labelled — see the red rows. Re-assign and check again.`,`${wrong.length}つの数字がまだ正しく分類されていない——赤い行を見て。割り当て直して、もう一度確認を。`)}</div>`);
     }
   }
-  function done(){ if(S.reworkMode){ go('rework'); return; } go('ps_build'); }
+  function done(){ if(S.reworkMode){ go('rework'); return; } go('stake_build'); }
 },
 
 /* ---------- block diagram build ---------- */
@@ -2233,18 +2417,66 @@ sipoc_build(){
       if(S.reworkMode){ go('rework'); return; }
       tickHalfDay();
       say(nm('Uni the Unicorn'),'uni',L('Noted and filed. Next: the customer gets a voice.','記録して整理。次は、顧客に声をあげてもらおう。'),()=>{
-        interact(`<button class="btn" id="nx">${L('Build the VOC table ✦','VOC表を作る ✦')}</button>`);
-        $('nx').onclick=()=>go('voc_build');
+        interact(`<button class="btn" id="nx">${L('Draw the scope boundaries ✦','範囲の境界線を引く ✦')}</button>`);
+        $('nx').onclick=()=>go('scope_build');
       });
     };
   }
 },
 
+/* ---------- scope build: In / Out / Parking lot ---------- */
+scope_build(){
+  renderTracker(4); drawWarroom(); addHelpBadge('scope'); banner(L('Deliverable 3 · Scope','成果物 3 · 範囲（スコープ）'));
+  narrate(L('A roll of red string and a box of pins. Uni has drawn a chalk rectangle on the table and written IN on one side, OUT on the other — and, smaller, LATER in a corner.',
+    '赤い糸のロールとピンの箱。ユニがテーブルにチョークで四角を描き、片側に「対象内」、反対側に「対象外」——そして隅に小さく「あとで」と書いた。'));
+  say(nm('Uni the Unicorn'),'uni',
+    L('Scope is the fence around the process you will study — and the SIPOC already told you where the posts go: first block to last block. Inside the fence: the line and what measures it. Outside: other people’s processes, and anything that is a FIX or a CULPRIT rather than a boundary. And the parking lot is for real work that belongs to a later phase — noted, not lost, not now. Draw carefully. Every extra thing inside the fence is a project you did not sign up for.',
+      'スコープとは、調べる工程の周りに立てる柵だ——そして柵の杭の位置は、SIPOCがすでに教えてくれている：最初のブロックから最後のブロックまで。柵の内側は、ラインと、それを測るもの。外側は、他人の工程、そして「境界」ではなく「対策」や「犯人」であるもの。保留の場所は、後のフェーズに属する本物の仕事のため——記録し、忘れず、今はやらない。慎重に線を引いて。柵の内側に余計なものが一つ増えるごとに、引き受けた覚えのないプロジェクトが一つ増える。'),()=>{
+    sorterUI({state:S.scope,items:SCOPE_ITEMS,cols:SCOPE_COLS,gridClass:'scope-grid',lockId:'lockscope',
+      lockEn:'Lock the scope ✦',lockJa:'範囲を確定 ✦',help:'scope',
+      onLock:()=>{
+        S.scopeDone=true;
+        if(S.reworkMode){ go('rework'); return; }
+        tickHalfDay();
+        say(nm('Uni the Unicorn'),'uni',L('Fence posts in. Now — the people. The customer gets a voice next.','杭は立った。次は人だ——顧客に声を。'),()=>{
+          interact(`<button class="btn" id="nx">${L('Hear the stakeholders ✦','関係者の声を聞く ✦')}</button>`);
+          $('nx').onclick=()=>go('voc_build');
+        });
+      }});
+  });
+},
+
+/* ---------- stakeholder grid: power × interest ---------- */
+stake_build(){
+  renderTracker(6); drawWarroom(); addHelpBadge('stake'); banner(L('Deliverable 5 · Stakeholder analysis','成果物 5 · 関係者分析'));
+  narrate(L('The meeting corner has emptied, but the chairs are still warm. Uni pins a two-by-two grid to the corkboard: POWER up the side, INTEREST along the bottom, and a stack of name cards.',
+    '打ち合わせコーナーは空になったが、椅子はまだ温かい。ユニがコルクボードに2×2の格子を貼る：縦に「権限」、横に「関心」、そして名札の束。'));
+  say(nm('Uni the Unicorn'),'uni',
+    L('You have heard everyone. Now decide how each of them is HANDLED for the next ninety days — because the grid is your communication plan. Two questions per name: can they change this project’s fate? Do they care how it turns out? High power, high interest — manage closely. Power without interest — keep satisfied. Interest without power — keep informed. Neither — monitor. Misplace the wrong dragon, and you will hear about it.',
+      '全員の声を聞いたね。では、この先90日間、それぞれをどう「扱う」かを決めて——この格子こそがコミュニケーション計画だから。名前ごとに問いは二つ：この人はプロジェクトの運命を変えられるか？結果を気にしているか？権限も関心も高い——綿密に管理。権限はあるが関心は低い——満足させておく。関心はあるが権限は低い——情報を共有。どちらも低い——見守る。竜の置き場所を間違えたら、後で聞かされることになるよ。'),()=>{
+    const axes=`<div class="axis">↑ ${L('POWER','権限')}  ·  ${L('INTEREST','関心')} →</div>`;
+    sorterUI({state:S.stake,items:STAKE_ITEMS,cols:STAKE_COLS,gridClass:'grid2',lockId:'lockstake',
+      lockEn:'Lock the stakeholder grid ✦',lockJa:'関係者格子を確定 ✦',help:'stake',axes,
+      onLock:()=>{
+        S.stakeDone=true;
+        if(S.reworkMode){ go('rework'); return; }
+        tickHalfDay();
+        say(nm('Uni the Unicorn'),'uni',L('Filed. Now the centerpiece: the problem statement.','記録した。では中心へ——問題記述だ。'),()=>{
+          interact(`<button class="btn" id="nx">${L('Write the problem statement ✦','問題記述を書く ✦')}</button>`);
+          $('nx').onclick=()=>go('ps_build');
+        });
+      }});
+  });
+},
+
 /* ---------- Voice of the Customer build: the stakeholder gauntlet ---------- */
 voc_build(){
-  renderTracker(4); drawWarroom(); addHelpBadge('voc'); banner(L('Deliverable 3 · Voice of the Customer','成果物 3 · 顧客の声（VOC）'));
-  narrate(L('Uni has gathered the stakeholders in the meeting corner: a small customer clutching a wounded plushie, the formidable owner of the Sakura Toy Emporium — and two employees who invited themselves. Everyone claims to have "needs."',
-    'ユニが打ち合わせコーナーに関係者を集めた：傷ついたぬいぐるみを抱きしめる小さなお客さま、サクラおもちゃ百貨店の威厳ある店主——そして、勝手に押しかけてきた従業員2人。全員が「ニーズがある」と主張している。'));
+  renderTracker(5); drawWarroom(); addHelpBadge('voc'); banner(L('Deliverable 3 · Voice of the Customer','成果物 3 · 顧客の声（VOC）'));
+  narrate(S.have.includes('m_shops')
+    ? L('Uni has gathered the stakeholders in the meeting corner: a small customer clutching a wounded plushie, the formidable owner of the Sakura Toy Emporium — and two employees who invited themselves. Everyone claims to have "needs."',
+        'ユニが打ち合わせコーナーに関係者を集めた：傷ついたぬいぐるみを抱きしめる小さなお客さま、サクラおもちゃ百貨店の威厳ある店主——そして、勝手に押しかけてきた従業員2人。全員が「ニーズがある」と主張している。')
+    : L('Uni has gathered the stakeholders in the meeting corner: a small customer clutching a wounded plushie, an EMPTY chair with a reserved card nobody filled in — and two employees who invited themselves. Someone who sells your plushies was never named, so never invited.',
+        'ユニが打ち合わせコーナーに関係者を集めた：傷ついたぬいぐるみを抱きしめる小さなお客さま、名前の書かれていない予約札の置かれた「空席」——そして、勝手に押しかけてきた従業員2人。ぬいぐるみを売っている誰かは、名前を聞かれなかったので、招かれなかった。'));
   if(!S.vocGame) S.vocGame={hana:{stage:0,done:false,pat:6},sakura:{stage:0,done:false,pat:6},capy:{stage:0,done:false,pat:5},torto:{stage:0,done:false,pat:5}};
   say(nm('Uni the Unicorn'),'uni',
     L('The Voice of the Customer — live, and on the clock. Each of them arrives with a WANT: loud, sincere, rarely measurable. Their patience is FINITE, Green Belt: every probing question spends a little, and a clumsy one spends MORE — and knocks the conversation back to its start. Spend it all, and that voice goes home unrecorded. Drill until a countable NEED appears. Push back on fixes. Reframe the insiders. And mind the meter.',
@@ -2258,8 +2490,10 @@ voc_build(){
     capy:{name:'Captain Capy',role:'Floor supervisor (internal customer)',cls:'capy',max:5},
     torto:{name:'Torto',role:'Veteran operator (internal customer)',cls:'torto',max:5},
   };
+  const sakuraLocked=()=>!S.have.includes('m_shops');
   function statusOf(id){
     const g=S.vocGame[id];
+    if(id==='sakura'&&sakuraLocked()) return [L('🔒 Not identified — you never asked Miko WHICH shops complain. Ask her (🆘 below) to unlock; it costs a day.','🔒 未特定——ミコに「どの店が」と聞かなかった。下の🆘で質問すれば解放（1日消費）。'),'warn'];
     if(g.lost) return ['✗ patience spent — voice lost today','warn'];
     if(!g.done) return [`…waiting · patience ${dots(id)}`,'warn'];
     if(id==='hana') return [{ok:'✓ CTQ: 1,000 hug-cycles',vague:'✓ recorded (vague…)',sol:'✓ recorded (a fix…)'}[S.ctq.smile]||'✓ recorded','ok'];
@@ -2281,12 +2515,13 @@ voc_build(){
   function renderStakes(){
     const cards=Object.keys(VGD).map(id=>{
       const d=VGD[id],[st,cls2]=statusOf(id);
-      return `<div class="person" data-s="${id}">
+      const lockCls=(id==='sakura'&&sakuraLocked())?' locked-p':'';
+      return `<div class="person${lockCls}" data-s="${id}">
         <div class="pav">${artHTML(d.cls)}</div>
         <div><div class="pn">${d.name}</div><div class="pr">${d.role}</div>
         <div class="stake-status ${cls2}">${st}</div></div></div>`;
     }).join('');
-    const customersDone=S.vocGame.hana.done&&S.vocGame.sakura.done;
+    const customersDone=S.vocGame.hana.done&&(S.vocGame.sakura.done||sakuraLocked());
     interact(`<div class="person-grid">${cards}</div>
       <div class="hint">${customersDone?'Everyone heard. Close the session when ready.':'Careful questions move people forward. Clumsy ones start you over — and the meter never refills.'}</div>
       <button class="btn" id="fin">${customersDone?'Close the VOC session ✦':'Close session early (risky) ✦'}</button>`+helpControl('voc'));
@@ -2326,6 +2561,10 @@ voc_build(){
   }
 
   function openStake(id){
+    if(id==='sakura'&&sakuraLocked()){
+      say('Uni the Unicorn','uni:concerned',L('That chair is empty because you never learned WHICH shop is complaining — Miko would have named her, had you asked. You can still reach out mid-session (the 🆘 below), but it costs a day of slip, and the Empress counts every consult.','その席が空なのは、きみが「どの店が」文句を言っているのかを聞かなかったからだ——聞いていれば、ミコが名前を教えてくれた。今からでも呼び出せる（下の🆘）。ただし1日の遅れになるし、皇帝は相談の回数を数えている。'),renderStakes);
+      return;
+    }
     if(S.vocGame[id].lost){
       say('Uni the Unicorn','uni:concerned','Their patience is spent for today, Green Belt. Some doors only reopen after tempers cool — the rework week, perhaps.',renderStakes);
       return;
@@ -2608,7 +2847,7 @@ voc_build(){
 
 /* ---------- problem statement build (fragment picker) ---------- */
 ps_build(){
-  renderTracker(5); drawWarroom(); addHelpBadge('ps'); banner(L('Deliverable 4 · Problem Statement','成果物 4 · 問題記述'));
+  renderTracker(7); drawWarroom(); addHelpBadge('ps'); banner(L('Deliverable 4 · Problem Statement','成果物 4 · 問題記述'));
   narrate(L('Dusk gilds the charter form. Five blanks wait on the page — and every fragment offered below traces back to your notebook: verified logs, honest guesses, and that break-room chatter you wrote down. Tap 📒 to check who actually said what.',
     '夕暮れがチャーター用紙を金色に染める。ページには5つの空欄。下に並ぶ断片はどれもきみのノートに遡れる——裏付けのある記録、正直な当て推量、そして書き留めた休憩室の噂話。誰が実際に言ったかは📒で確認を。'));
   say(nm('Uni the Unicorn'),'uni',
@@ -2645,7 +2884,7 @@ ps_build(){
 
 /* ---------- objective statement build ---------- */
 obj_build(){
-  renderTracker(6); drawWarroom(); addHelpBadge('obj'); banner(L('Deliverable 5 · Objective Statement','成果物 5 · 目標記述'));
+  renderTracker(8); drawWarroom(); addHelpBadge('obj'); banner(L('Deliverable 5 · Objective Statement','成果物 5 · 目標記述'));
   narrate(L('One line left on the charter. The quill feels heavier than it should — destinations always do. The fragments below come from your notebook too: some from the logs, some from the break room. 📒 remembers which is which.',
     'チャーターに残るはあと1行。羽ペンがやけに重く感じる——目的地というのはいつもそうだ。下の断片もきみのノートから：記録から来たものも、休憩室から来たものもある。どれがどれかは📒が覚えている。'));
   say(nm('Uni the Unicorn'),'uni',
@@ -2686,7 +2925,7 @@ charter(){
   narrate(L('Night settles over the mill. The finished charter lies in the lamplight, looking either like a foundation or a confession — tomorrow will decide which.',
     '工場に夜が降りる。仕上がったチャーターがランプの灯りの下に横たわる——礎にも、白状にも見える。どちらになるかは、明日が決める。'));
   say(nm('Uni the Unicorn'),'uni',
-    L('Your charter is assembled: block diagram, SIPOC, VOC with CTQs, problem statement, objective statement. Tomorrow morning, Empress Scarlet reviews everything. Sleep well, Green Belt. Or try.',
+    L('Your charter is assembled: block diagram, SIPOC, scope, VOC with CTQs, stakeholder grid, problem statement, objective statement. Tomorrow morning, Empress Scarlet reviews everything — and the calendar. Sleep well, Green Belt. Or try.',
       'チャーターが揃った：ブロック図、SIPOC、CTQ付きのVOC、問題記述、目標記述。明日の朝、スカーレット皇帝がすべてを審査する。よく眠って、グリーンベルト。…眠れるものならね。'),()=>{
     const o=S.obj;
     const objSent=`${o.verb.t} ${o.metric.t} ${o.base.t} ${o.target.t} ${o.when.t}${o.how&&o.how.v==='how'?' '+o.how.t:''}.`;
@@ -2696,7 +2935,8 @@ charter(){
       <b>${L('Problem statement:','問題記述：')}</b> ${L('Since','')} ${gf(S.ps.date)}${L(', the ','以来、')}${gf(S.ps.metric)}${L(' has been at ','は ')}${gf(S.ps.base)}${L(', compared to a target of ','（目標：')}${gf(S.ps.target)}${L('. This gap causes a COPQ of ','）。この差が生むCOPQ：')}${gf(S.ps.copq)}.<br>
       <b>${L('Objective:','目標：')}</b> ${objSent}<br>
       <b>${L('Customer CTQs:','顧客CTQ：')}</b> ${Object.keys(S.ctq).length||'—'} ${L('defined from VOC','件（VOCより定義）')}<br>
-      <b>${L('Scope:','範囲：')}</b> ${L('The 8-block plushie line (per attached block diagram & SIPOC).','ぬいぐるみ製造ライン8ブロック（添付のブロック図・SIPOCに準拠）。')}
+      <b>${L('Scope (in):','範囲（対象内）：')}</b> ${S.scope.IN.length?S.scope.IN.map(i=>L(SCOPE_ITEMS[i].en,SCOPE_ITEMS[i].ja)).join('; '):`<i style="color:#c48a3a">${L('(undefined)','（未定義）')}</i>`}<br>
+      <b>${L('Stakeholders managed closely:','綿密に管理する関係者：')}</b> ${S.stake.MC.length?S.stake.MC.map(i=>L(STAKE_ITEMS[i].en,STAKE_ITEMS[i].ja).split(' —')[0]).join(', '):`<i style="color:#c48a3a">${L('(none placed)','（未配置）')}</i>`}
     </div>
     <button class="btn" id="nx">${L('🌙 Sleep… then face the dragon','🌙 眠る…そして竜と対峙する')}</button>`);
     $('nx').onclick=()=>{S.day++;S.half=0;go('tg_intro');};
@@ -2705,14 +2945,14 @@ charter(){
 
 /* ---------- TOLLGATE ---------- */
 tg_intro(){
-  renderTracker(7); drawBoardroom('reading'); banner(L('TOLLGATE REVIEW · The Empress','トールゲート審査 · 皇帝'));
+  renderTracker(9); drawBoardroom('reading'); banner(L('TOLLGATE REVIEW · The Empress','トールゲート審査 · 皇帝'));
   narrate(L('The boardroom. Cinnamon, polished mahogany, and fear. A tea service nobody dares touch sits precisely in the center of the table.',
     '重役室。シナモンと磨かれたマホガニー、そして恐れの匂い。誰も手をつけようとしない茶器が、テーブルの中央にきっちりと置かれている。'));
   S.tollgateAttempts++;
   say(nm('Narrator'),'narr',
     L('The boardroom smells faintly of cinnamon and fear. Empress Scarlet coils into her chair, reading glasses perched on her snout, your charter held in one immaculate claw. Capy, Uni','重役室にはシナモンと恐れがかすかに漂う。スカーレット皇帝が椅子にとぐろを巻き、鼻先に読書用眼鏡をのせ、非の打ちどころのない爪できみのチャーターを掲げている。カピー、ユニ') +
     (S.interviewed.luna?L(', Luna','、ルナ'):'') + (S.interviewed.penny?L(', Penny','、ペニー'):'') + L(' and half the factory squeeze along the wall to watch.','、そして工場の半分が壁際に押し寄せて見守っている。'),()=>{
-    interact(`<button class="btn" id="nx">${L('Begin the review ✦','審査を始める ✦')}</button>`);
+    interact(scheduleNote()+`<button class="btn" id="nx">${L('Begin the review ✦','審査を始める ✦')}</button>`);
     $('nx').onclick=()=>go(S.consults>0?'tg_consult':'tg_flow');
   });
 },
@@ -2771,6 +3011,25 @@ tg_sipoc(){
       interact(reviewSipoc()+`<div class="feedback good">"Clean," she says, almost disappointed. "Suppliers, inputs, outputs, customers — all where they belong. Even the nonsense correctly binned." Somewhere in the back, someone whispers that the zero-defects poster was \u201cinspirational, actually.\u201d</div>
         <button class="btn" id="nx">Continue ✦</button>`);
     }
+    $('nx').onclick=()=>go('tg_scope');
+  });
+},
+tg_scope(){
+  const r=evalTollgate();
+  say(nm('Empress Scarlet'),'dragon:reading',
+    L('Scope. The fence you have drawn around this project — because everything inside it is now MY money.',
+      'スコープ。きみがこのプロジェクトの周りに引いた柵——その内側にあるものはすべて、今やわたしの金だ。'),()=>{
+    const beats=[];
+    const rv=reviewSorter(SCOPE_ITEMS,SCOPE_COLS,S.scope);
+    if(r.crit.includes('scope_incomplete')) beats.push(`<div class="feedback badf">🐉 ${L('"A project with no fence. Anything may wander in — and everything will."','「柵のないプロジェクト。何でも入り込める——そして、すべてが入り込む。」')}</div>`+coach('scope_incomplete'));
+    if(r.crit.includes('scope_contam')) beats.push(`<div class="feedback badf">🐉 ${L('"You have written a PURCHASE and a PUNISHMENT into your scope." A wisp of smoke. "Scope is the boundary of the process you will study. Not a shopping list. Not a hit list."','「スコープに『購入』と『処分』を書き込んだね。」一筋の煙。「スコープとは、調べる工程の境界。買い物リストでも、粛清リストでもない。」')}</div>`+coach('scope_contam'));
+    if(r.crit.includes('scope_creep')) beats.push(`<div class="feedback badf">🐉 ${L('"Morale. Harvest methods. Shelf displays." She counts on her claws. "You have scoped a KINGDOM, Green Belt, on a ninety-day calendar. Scope creep is how projects die politely."','「士気。収穫方法。陳列。」彼女は爪で数える。「きみは90日の暦で『王国』をスコープにしたね、グリーンベルト。スコープの膨張は、プロジェクトが礼儀正しく死ぬ方法だ。」')}</div>`+coach('scope_creep'));
+    if(r.crit.includes('scope_core')) beats.push(`<div class="feedback badf">🐉 ${L('"And the stitching line itself — the thing that MAKES the smiles — is outside your fence?" She turns the page over, as if the line might be hiding on the back.','「それで、縫製ライン——笑顔を『作る』その工程が、柵の外側？」彼女はページを裏返す。ラインが裏に隠れているかのように。')}</div>`+coach('scope_core'));
+    if(r.crit.includes('scope_muddled')) beats.push(`<div class="feedback badf">🐉 ${L('"Half of these are on the wrong side of the line. Inside, outside, later — you have made it a matter of opinion."','「半分は線の反対側にある。内、外、あとで——きみはそれを『意見の問題』にしてしまった。」')}</div>`+coach('scope_muddled'));
+    if(r.minor.includes('scope_minor')) beats.push(`<div class="feedback tip">${L('One item circled in red ink. "Borderline. Re-check it before Measure."','赤インクで一項目に丸。「境界線ぎりぎり。Measureの前に見直して。」')}</div>`+coach('scope_minor'));
+    if(!beats.length) beats.push(`<div class="feedback good">${L('"Receiving to shipping. The measurement inside, the shopping list outside, the real work parked for its proper phase." She nods once. "A fence I can fund."','「受入から出荷まで。測定は内側、買い物リストは外側、本物の仕事は正しいフェーズまで保留。」彼女は一度うなずく。「これなら金を出せる柵だ。」')}</div>`);
+    dragonReact(beats.join(''));
+    interact(rv+beats.join('')+`<button class="btn" id="nx">${L('Continue ✦','続ける ✦')}</button>`);
     $('nx').onclick=()=>go('tg_voc');
   });
 },
@@ -2796,7 +3055,7 @@ tg_voc(){
     if(r.minor.includes('voc_missed')){
       const missedHana=!(S.voc.voc.includes('v1')||S.voc.voc.includes('v2'));
       const missedSakura=!S.voc.voc.includes('v3');
-      const who=[missedHana?'the CHILD who hugs your product':null,missedSakura?'the RETAILER who sells it':null].filter(Boolean).join(' and ');
+      const who=[missedHana?'the CHILD who hugs your product':null,missedSakura?(S.have.includes('m_shops')?'the RETAILER who sells it':'the RETAILER you never even identified — Miko would have named her, had you asked which shops complain'):null].filter(Boolean).join(' and ');
       beats.push(
       `<div class="feedback tip">"A genuine customer voice is missing from this table: ${who}. They were in the room, Green Belt. The charter does not remember them."</div>`+coach('voc_missed'));
     }
@@ -2806,6 +3065,24 @@ tg_voc(){
       `<div class="feedback good">She reads the letters, then your CTQs: smile survives 1,000 hug-cycles; defective arrivals AND customer returns both held to 0.5% or less. "Measurable. Traceable to real voices. The child and the shopkeeper are both in the room with us now." She almost — almost — smiles.</div>`);
     dragonReact(beats.join(''));
     interact(reviewVOC()+beats.join('')+'<button class="btn" id="nx">Continue ✦</button>');
+    $('nx').onclick=()=>go('tg_stake');
+  });
+},
+tg_stake(){
+  const r=evalTollgate();
+  say(nm('Empress Scarlet'),'dragon:reading',
+    L('Your stakeholder grid. Let us see how you intend to HANDLE the people in this room for ninety days. Including me.',
+      '関係者の格子。この部屋の人々を90日間どう『扱う』つもりか、見せてもらおう。わたしも含めて。'),()=>{
+    const beats=[];
+    const rv=reviewSorter(STAKE_ITEMS,STAKE_COLS,S.stake);
+    if(r.crit.includes('stake_incomplete')) beats.push(`<div class="feedback badf">🐉 ${L('"Half the names are still in the stack. A communication plan for nobody."','「名札の半分がまだ束のまま。誰のためでもないコミュニケーション計画だね。」')}</div>`+coach('stake_incomplete'));
+    if(r.crit.includes('stake_empress')) beats.push(`<div class="feedback badf">🐉 ${L('A very long silence. "You have placed ME…" she reads the quadrant label aloud, "…here." The tea service rattles faintly. "I sign your budget. I close your tollgates. I am the one dragon in this kingdom who can end this project with a yawn. Manage. Me. CLOSELY."','とても長い沈黙。「きみは『わたし』を…」彼女は象限の名前を読み上げる、「…ここに置いたね。」茶器がかすかに鳴る。「わたしはきみの予算に署名し、トールゲートを閉じる。この王国で、あくび一つでこのプロジェクトを終わらせられる唯一の竜だ。わたしを。綿密に。管理しなさい。」')}</div>`+coach('stake_empress'));
+    if(r.crit.includes('stake_customer')) beats.push(`<div class="feedback badf">🐉 ${L('"The shop that can pause our orders — or the children who are the entire POINT — filed under ‘monitor’?" Her glasses come off. "Monitor is for people who will never notice we exist."','「発注を止められる店——あるいは、この件の『意味』そのものである子どもたち——を『見守る』に？」眼鏡が外れる。「『見守る』は、わたしたちの存在に気づきもしない人のための箱だよ。」')}</div>`+coach('stake_customer'));
+    if(r.crit.includes('stake_muddled')) beats.push(`<div class="feedback badf">🐉 ${L('"Suppliers managed closely, operators monitored, the treasury forgotten. You have drawn a map of who is LOUDEST, not who has POWER."','「供給者を綿密に管理し、作業員を見守り、経理を忘れる。きみが描いたのは『誰が一番うるさいか』の地図で、『誰に権限があるか』ではない。」')}</div>`+coach('stake_muddled'));
+    if(r.minor.includes('stake_minor')) beats.push(`<div class="feedback tip">${L('One name nudged to a neighbouring box with a claw. "Close. Think about who FEELS the result."','爪で一枚の名札を隣の箱へ。「近い。結果を『感じる』のは誰かを考えて。」')}</div>`+coach('stake_minor'));
+    if(!beats.length) beats.push(`<div class="feedback good">${L('"Champion and process owner managed closely; the retailer too — wise. Operators and care staff kept informed, the treasury kept satisfied, suppliers watched." She sets the page down. "You know who can hurt you and who you are doing this for. Those are different lists, and you kept them straight."','「チャンピオンと工程オーナーを綿密に管理、小売店も——賢明だ。作業員とケア担当には情報共有、経理は満足させ、供給者は見守る。」彼女はページを置く。「誰がきみを傷つけられるか、誰のためにやっているか。それは別のリストで、きみはそれを混ぜなかった。」')}</div>`);
+    dragonReact(beats.join(''));
+    interact(rv+beats.join('')+`<button class="btn" id="nx">${L('Continue ✦','続ける ✦')}</button>`);
     $('nx').onclick=()=>go('tg_ps');
   });
 },
@@ -2887,7 +3164,7 @@ tg_obj(){
 tg_verdict(){
   const r=evalTollgate();
   if(r.crit.length===0){
-    const honors=r.minor.length<=2 && S.consults===0;
+    const honors=r.minor.length<=2 && S.consults===0 && !defineLate();
     setDragonMood(honors?'softened':'approving'); setPlayerMood('determined');
     const passMsg = honors
       ? L('The verdict: PASSED. Cleanly. In one sitting, which I confess I did not expect. Your Define phase is approved — the problem has a size, the customer has a voice, the objective has a destination, and nobody has been blamed or sold a machine. Proceed to Measure, Green Belt. Do not make me regret the compliment.',
@@ -2929,7 +3206,7 @@ rework(){
   /* During rework, EVERY missing information source becomes available —
      no route can leave the player unable to finish properly. */
   const needPenny = !S.have.includes('p_mag');
-  const needMiko  = !S.vocUnlocked || !S.have.includes('m_impact') || ((r.crit.includes('metric_gameable')||r.crit.includes('metric_time')) && !S.have.includes('m_voc') && !S.have.includes('m_ctq'));
+  const needMiko  = !S.vocUnlocked || !S.have.includes('m_shops') || !S.have.includes('m_impact') || ((r.crit.includes('metric_gameable')||r.crit.includes('metric_time')) && !S.have.includes('m_voc') && !S.have.includes('m_ctq'));
   const needTorto = !S.have.includes('t_flow');
   const needLuna  = !S.have.includes('l_counter') && r.crit.includes('blame');
   const psFlags=['mag_anecdote','mag_wrong','mag_missing','blame','solution','cause','ps_incomplete','metric_gameable','metric_time'].some(f=>r.crit.includes(f))||['opinion','muddled','vague_what','target_vague','copq_vague','obj_unreal','metric_mismatch'].some(f=>r.minor.includes(f));
@@ -2955,6 +3232,10 @@ rework(){
       html+=`<button class="choice" id="fx_obj"><span class="tag">Objective statement</span>Rebuild the objective — verified baseline, real target, and NO how.</button>`;
     if(vocFlags)
       html+=`<button class="choice" id="fx_voc"><span class="tag">Voice of the Customer</span>Re-sort the voices and choose measurable CTQs.</button>`;
+    if(['scope_contam','scope_creep','scope_core','scope_muddled','scope_incomplete'].some(f=>r.crit.includes(f))||r.minor.includes('scope_minor'))
+      html+=`<button class="choice" id="fx_scope"><span class="tag">Scope</span>Redraw the fence — in, out, parking lot.</button>`;
+    if(['stake_empress','stake_customer','stake_muddled','stake_incomplete'].some(f=>r.crit.includes(f))||r.minor.includes('stake_minor'))
+      html+=`<button class="choice" id="fx_stake"><span class="tag">Stakeholders</span>Re-place the names on the power/interest grid.</button>`;
     if(r.crit.includes('flow'))
       html+=`<button class="choice" id="fx_flow"><span class="tag">Block diagram</span>Re-walk the line and fix the block order. Capy promises to focus this time.</button>`;
     if(r.crit.includes('sipoc'))
@@ -2973,6 +3254,8 @@ rework(){
     wire('fx_ps',()=>go('rw_ps'));
     wire('fx_obj',()=>go('rw_obj'));
     wire('fx_voc',()=>go('rw_voc'));
+    wire('fx_scope',()=>go('rw_scope'));
+    wire('fx_stake',()=>go('rw_stake'));
     wire('fx_flow',()=>go('rw_flow'));
     wire('fx_sipoc',()=>go('rw_sipoc'));
     wire('retg',()=>{ S.day++; S.reworkMode=false; go('tg_intro'); });
@@ -2994,7 +3277,7 @@ rw_miko(){
   narrate('The fortress of boxes has grown a new tower since last week. Miko does not say I-told-you-so. Her eyebrows say it for her.');
   say('Miko Cat','miko:dramatic',
     '*wordlessly hands you the stack of letters, then a second stack, then a third* Letter #112: "My daughter cried — the smile came undone after ONE week of hugs." The Sakura Toy Emporium: "we need shipments where every plushie is sellable." And the ledger, since you will need it: returns TRIPLED, forty-eight thousand gold in refunds last quarter, two shops pausing orders. A thousand hugs, minimum, nya. THAT is who you work for.',()=>{
-    S.vocUnlocked=true; addCards(['m_ctq','m_voc','m_impact','p_field']);
+    S.vocUnlocked=true; addCards(['m_ctq','m_voc','m_impact','p_field','m_shops']);
     interact(`<div class="feedback good">📒 The customer’s actual voice AND the business impact, finally in your notebook. Rebuild the VOC table and the problem statement to use them.</div>
       <button class="btn" id="nx">Back to rework ✦</button>`);
     $('nx').onclick=()=>go('rework');
@@ -3027,11 +3310,13 @@ rw_obj(){ banner('Rework · Objective Statement'); SCENES.obj_build(); },
 rw_voc(){ banner('Rework · Voice of the Customer'); S.voc={voc:[],noise:[]}; S.ctq={}; S.vocGame=null; SCENES.voc_build(); },
 rw_flow(){ banner('Rework · Block Diagram'); SCENES.flow_build(); },
 rw_sipoc(){ banner('Rework · SIPOC'); SCENES.sipoc_build(); },
+rw_scope(){ banner('Rework · Scope'); SCENES.scope_build(); },
+rw_stake(){ banner('Rework · Stakeholders'); SCENES.stake_build(); },
 
 /* ---------- endings ---------- */
 epilogue_pass(){
   const r=evalTollgate();
-  const honors=r.crit.length===0&&r.minor.length<=2&&S.tollgateAttempts===1&&S.consults===0;
+  const honors=r.crit.length===0&&r.minor.length<=2&&S.tollgateAttempts===1&&S.consults===0&&!defineLate();
   drawBackdrop('scene_floor'); banner(L('DEFINE · COMPLETE','DEFINE · 完了'));
   narrate(L('Fluff drifts through the sunbeams like confetti. Somewhere on the line, a plushie rolls past with a perfect, permanent smile.',
     '陽の光の中を、ふわふわが紙吹雪のように舞う。ラインのどこかで、完璧で、ずっと消えない笑顔のぬいぐるみが流れていく。'));
@@ -3055,6 +3340,7 @@ epilogue_pass(){
         <span class="pill">${L(`🗣️ Interviews: ${Object.keys(S.interviewed).length}/4`,`🗣️ 聞き取り：${Object.keys(S.interviewed).length}/4`)}</span>
         <span class="pill">${L(`💬 CTQs defined: ${Object.keys(S.ctq).length}`,`💬 定義したCTQ：${Object.keys(S.ctq).length}`)}</span>
         <span class="pill">${L(`📅 Slip: ${S.daysLost} days`,`📅 遅れ：${S.daysLost}日`)}</span>
+        <span class="pill">${defineLate()?L(`⏳ Define ran ${fmtDays(daysUsed()-DEFINE_DAYS)}d over`,`⏳ Define ${fmtDays(daysUsed()-DEFINE_DAYS)}日超過`):L('⏳ Define delivered on time','⏳ Define 期限内に完了')}</span>
         <span class="pill">${L(`🆘 Build-time consults: ${S.consults}`,`🆘 作成中の相談：${S.consults}`)}</span>
         <span class="pill">${L(`🐉 Attempts: ${S.tollgateAttempts}`,`🐉 挑戦回数：${S.tollgateAttempts}`)}</span>
       </div>

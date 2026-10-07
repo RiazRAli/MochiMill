@@ -1,0 +1,1 @@
+{"compress": {"passes": 2, "drop_console": false, "keep_fargs": false, "unsafe": false}, "mangle": {"toplevel": true, "reserved": ["DEV", "dev", "openHelp", "openProfile", "S"]}, "format": {"comments": false, "ascii_only": false, "beautify": false}, "toplevel": true}
